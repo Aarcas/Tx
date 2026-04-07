@@ -654,48 +654,45 @@ function parseSetup(text) {
   };
 }
 
-// ── CALL CLAUDE API ───────────────────────────────────────────────────────
+// --- REPLACE YOUR ENTIRE callClaude FUNCTION WITH THIS ---
 async function callClaude(candles, levels, patterns, symbol, tf) {
   const last = candles[candles.length-1];
   const closes = candles.map(c=>c.close);
   const e20 = ema(closes,20), e50 = ema(closes,50);
-  const pct = ((last.close - candles[0].close)/candles[0].close*100).toFixed(2);
   const tfLabel = {'1':'1m','5':'5m','15':'15m','30':'30m','60':'1H','240':'4H','D':'1D'}[tf] || tf;
   const above20 = last.close > e20[e20.length-1];
-  const above50 = last.close > e50[e50.length-1];
 
-  const prompt = `You are an elite crypto technical analyst. Analyze ${symbol} on the ${tfLabel} timeframe.
+  // 1. Create the prompt
+  const prompt = `Analyze ${symbol} on ${tfLabel}. Price: $${last.close}. EMA20: ${above20?'Above':'Below'}. Patterns: ${patterns.map(p=>p.n).join(', ')}. Provide Bias, Entry, SL, Target, and a 3-sentence Analysis.`;
 
-MARKET DATA:
-- Price: $${last.close.toFixed(2)} | Change: ${pct}%
-- High: $${Math.max(...candles.map(c=>c.high)).toFixed(2)} | Low: $${Math.min(...candles.map(c=>c.low)).toFixed(2)}
-- EMA20: $${e20[e20.length-1].toFixed(2)} (price is ${above20?'ABOVE':'BELOW'})
-- EMA50: $${e50[e50.length-1].toFixed(2)} (price is ${above50?'ABOVE':'BELOW'})
+  try {
+    // 2. Call your Vercel Bridge
+    const res = await fetch('/api/analyze', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
 
-KEY LEVELS: ${levels.map(l=>`$${l.toFixed(2)}(${l>last.close?'R':'S'})`).join(', ')}
+    const data = await res.json();
 
-PATTERNS: ${patterns.length?patterns.map(p=>`${p.n}(${p.t})`).join(', '):'None confirmed'}
+    // 3. SAFETY CHECK: If Claude sends an error, show it instead of crashing
+    if (data.error) {
+      console.error("Claude API Error:", data.error);
+      return "ERROR: " + (data.error.message || "Check API Key in Vercel Settings");
+    }
 
-Respond in this EXACT format:
+    if (!data.content || !Array.isArray(data.content)) {
+      console.log("Unexpected data format:", data);
+      return "ERROR: Received unexpected data format from bridge.";
+    }
 
-BIAS: [Bullish/Bearish/Neutral]
+    // 4. Success! Map the text
+    return data.content.map(b => b.text || '').join('');
 
-ENTRY: $[price]
-STOP LOSS: $[price]
-TARGET: $[price]
-RISK/REWARD: [ratio]R
-
-ANALYSIS:
-[3-4 sentences. Sharp. Direct. What the chart is saying, what to watch, one key risk. No fluff.]`;
-
-/* PASTE THIS NEW BLOCK INSTEAD */
-  const res = await fetch('/api/analyze', { 
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt })
-  });
-  const data = await res.json();
-  return data.content.map(b=>b.text||'').join('');
+  } catch (err) {
+    console.error("Fetch Error:", err);
+    return "CONNECTION ERROR: Could not reach the API bridge.";
+  }
 }
 
 // ── RENDER RESULTS ────────────────────────────────────────────────────────
