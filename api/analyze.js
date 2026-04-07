@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   try {
     const { prompt } = req.body;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -9,17 +10,19 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 1000,
+        model: 'claude-3-5-sonnet-20240620', // Using the most stable model name
+        max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }]
       })
     });
 
     const data = await response.json();
 
-    // If Anthropic returns an error, send it back to the dashboard
+    // THIS IS THE FIX: If there is an error, send the message as TEXT
     if (data.error) {
-      return res.status(400).json({ error: data.error });
+      return res.status(400).json({ 
+        error: { message: data.error.message || "Unknown API Error" } 
+      });
     }
 
     res.status(200).json(data);
