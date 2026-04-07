@@ -689,7 +689,7 @@ ANALYSIS:
 [3-4 sentences. Sharp. Direct. What the chart is saying, what to watch, one key risk. No fluff.]`;
 
 /* PASTE THIS NEW BLOCK INSTEAD */
-  const res = await fetch('/api/analyze', { 
+  const res = await fetch('analyze', { 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt: prompt })
