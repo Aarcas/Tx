@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingView + Claude AI</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #0d0d0d;
+  --surface: #141414;
+  --surface2: #1a1a1a;
+  --border: #222;
+  --border2: #2a2a2a;
+  --green: #00e676;
+  --red: #ff1744;
+  --yellow: #ffea00;
+  --blue: #2979ff;
+  --purple: #d500f9;
+  --text: #f0f0f0;
+  --muted: #555;
+  --muted2: #777;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  gap: 12px;
+}
+
+.brand {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.brand em { color: var(--green); font-style: normal; }
+
+.divider { width: 1px; height: 28px; background: var(--border2); margin: 0 4px; }
+
+.symbol-input {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 5px;
+  width: 110px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.symbol-input:focus { border-color: var(--green); }
+
+.tf-group {
+  display: flex;
+  gap: 3px;
+}
+
+.tf-btn {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tf-btn:hover { border-color: var(--green); color: var(--green); }
+.tf-btn.active { background: var(--green); border-color: var(--green); color: #000; font-weight: 600; }
+
+.analyze-btn {
+  margin-left: auto;
+  background: var(--green);
+  color: #000;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1.5px;
+  padding: 8px 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.analyze-btn:hover { background: #00ff85; transform: translateY(-1px); }
+.analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── MAIN LAYOUT ── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── TV CHART ── */
+.chart-side {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: #131722;
+}
+
+#tv-widget {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── PANEL ── */
+.panel {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+/* idle state */
+.idle-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  text-align: center;
+  padding: 20px;
+}
+
+.idle-icon {
+  font-size: 40px;
+  opacity: 0.2;
+}
+
+.idle-text {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* loading */
+.loading-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  text-align: center;
+}
+.loading-state.active { display: flex; }
+
+.loader {
+  width: 36px; height: 36px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--green);
+  letter-spacing: 2px;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* results */
+.results { display: none; }
+.results.active { display: block; }
+
+/* Ticker strip */
+.ticker-strip {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ticker-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+
+.ticker-price {
+  text-align: right;
+}
+
+.price-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.price-chg {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.price-chg.up { color: var(--green); }
+.price-chg.down { color: var(--red); }
+
+/* Bias pill */
+.bias-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bias-pill {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 5px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.bias-pill.bull { background: rgba(0,230,118,0.12); border: 1px solid rgba(0,230,118,0.3); color: var(--green); }
+.bias-pill.bear { background: rgba(255,23,68,0.12); border: 1px solid rgba(255,23,68,0.3); color: var(--red); }
+.bias-pill.neutral { background: rgba(255,234,0,0.08); border: 1px solid rgba(255,234,0,0.25); color: var(--yellow); }
+
+/* Key levels */
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  margin-top: 12px;
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.level-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.level-tag.r { color: var(--red); }
+.level-tag.s { color: var(--green); }
+
+.level-price {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+
+/* Pattern tags */
+.pattern-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pattern-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.pattern-tag.bull { background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.25); color: var(--green); }
+.pattern-tag.bear { background: rgba(255,23,68,0.1); border: 1px solid rgba(255,23,68,0.25); color: var(--red); }
+.pattern-tag.neutral { background: rgba(41,121,255,0.1); border: 1px solid rgba(41,121,255,0.25); color: var(--blue); }
+
+/* Trade setup */
+.setup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.setup-card {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+
+.setup-card-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.setup-card-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.setup-card-val.entry { color: var(--yellow); }
+.setup-card-val.sl { color: var(--red); }
+.setup-card-val.tp { color: var(--green); }
+.setup-card-val.rr { color: var(--purple); }
+
+/* AI narrative */
+.ai-narrative {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: #aaa;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 300;
+  padding: 12px;
+  background: var(--surface2);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+
+/* bottom bar */
+.panel-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* Scrollbar */
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* responsive */
+@media (max-width: 700px) {
+  .main { flex-direction: column; }
+  .panel { width: 100%; height: 340px; border-left: none; border-top: 1px solid var(--border); }
+  .tf-group { display: none; }
+  body { overflow: auto; height: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">CHART<em>AI</em></div>
+  <div class="divider"></div>
+  <input class="symbol-input" id="symbolInput" type="text" value="BTCUSDT" placeholder="BTCUSDT" />
+  <div class="tf-group" id="tfGroup">
+    <button class="tf-btn" onclick="setTF(this,'1')">1m</button>
+    <button class="tf-btn" onclick="setTF(this,'5')">5m</button>
+    <button class="tf-btn" onclick="setTF(this,'15')">15m</button>
+    <button class="tf-btn" onclick="setTF(this,'30')">30m</button>
+    <button class="tf-btn active" onclick="setTF(this,'60')">1H</button>
+    <button class="tf-btn" onclick="setTF(this,'240')">4H</button>
+    <button class="tf-btn" onclick="setTF(this,'D')">1D</button>
+  </div>
+  <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">⚡ ANALYZE</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TradingView Chart -->
+  <div class="chart-side">
+    <div id="tv-widget"></div>
+  </div>
+
+  <!-- Claude Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Claude Analysis</span>
+      <div class="pulse" id="pulseEl" style="opacity:0.3"></div>
+    </div>
+
+    <div class="panel-body" id="panelBody">
+
+      <!-- Idle -->
+      <div class="idle-state" id="idleState">
+        <div class="idle-icon">🤖</div>
+        <div class="idle-text">
+          Set your symbol &amp; timeframe,<br>then click <strong style="color:#f0f0f0">ANALYZE</strong><br>to get Claude's full read.
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-state" id="loadingState">
+        <div class="loader"></div>
+        <div class="loading-label" id="loadingLabel">ANALYZING...</div>
+      </div>
+
+      <!-- Results -->
+      <div class="results" id="resultsPanel">
+
+        <!-- Ticker -->
+        <div class="ticker-strip">
+          <div class="ticker-name" id="rSymbol">—</div>
+          <div class="ticker-price">
+            <div class="price-val" id="rPrice">—</div>
+            <div class="price-chg" id="rChange">—</div>
+          </div>
+        </div>
+
+        <!-- Bias -->
+        <div class="bias-row">
+          <div class="bias-pill" id="rBias">—</div>
+        </div>
+
+        <!-- Key Levels -->
+        <div class="section-label">Key Levels</div>
+        <div id="rLevels"></div>
+
+        <!-- Patterns -->
+        <div class="section-label">Patterns Detected</div>
+        <div class="pattern-tags" id="rPatterns"></div>
+
+        <!-- Trade Setup -->
+        <div class="section-label">Trade Setup</div>
+        <div class="setup-grid" id="rSetup"></div>
+
+        <!-- AI Narrative -->
+        <div class="section-label">Claude's Read</div>
+        <div class="ai-narrative" id="rNarrative"></div>
+
+      </div>
+    </div>
+
+    <div class="panel-footer">NOT FINANCIAL ADVICE · FOR EDUCATIONAL USE</div>
+  </div>
+</div>
+
+<!-- TradingView Widget Script -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentTF = '60';
+let tvWidget = null;
+
+// ── TF SELECTOR ───────────────────────────────────────────────────────────
+function setTF(btn, tf) {
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTF = tf;
+  loadTVWidget();
+}
+
+// ── LOAD TRADINGVIEW WIDGET ───────────────────────────────────────────────
+function loadTVWidget() {
+  const symbol = document.getElementById('symbolInput').value.trim().toUpperCase() || 'BTCUSDT';
+  const container = document.getElementById('tv-widget');
+  container.innerHTML = '';
+
+  tvWidget = new TradingView.widget({
+    container_id: 'tv-widget',
+    symbol: 'BINANCE:' + symbol,
+    interval: currentTF,
+    timezone: 'Etc/UTC',
+    theme: 'dark',
+    style: '1',           // candlestick
+    locale: 'en',
+    toolbar_bg: '#0d0d0d',
+    enable_publishing: false,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    save_image: false,
+    studies: [
+      'MAExp@tv-scriptstd',   // EMA
+      'RSI@tv-scriptstd',     // RSI
+      'MACD@tv-scriptstd'     // MACD
+    ],
+    width: '100%',
+    height: '100%',
+    autosize: true,
+    withdateranges: true,
+    allow_symbol_change: true,
+    details: true,
+    hotlist: false,
+    calendar: false,
+  });
+}
+
+// ── FETCH PRICE DATA FROM BINANCE ─────────────────────────────────────────
+async function fetchCandles(symbol, interval, limit = 150) {
+  const tf = { '1':'1m','5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','D':'1d' };
+  const pair = symbol.endsWith('USDT') ? symbol : symbol + 'USDT';
+  const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${tf[interval]||'1h'}&limit=${limit}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Symbol not found on Binance: ' + pair);
+  const data = await r.json();
+  return data.map(k => ({
+    time: k[0], open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5]
+  }));
+}
+
+// ── TECHNICAL HELPERS ─────────────────────────────────────────────────────
+function ema(arr, p) {
+  const k = 2 / (p + 1); let e = arr[0];
+  return arr.map(v => { e = v * k + e * (1 - k); return e; });
+}
+
+function pivots(candles, w=5) {
+  const h=[], l=[];
+  for(let i=w; i<candles.length-w; i++){
+    let iH=true, iL=true;
+    for(let j=i-w;j<=i+w;j++){
+      if(j===i) continue;
+      if(candles[j].high>=candles[i].high) iH=false;
+      if(candles[j].low<=candles[i].low) iL=false;
+    }
+    if(iH) h.push({i, p:candles[i].high});
+    if(iL) l.push({i, p:candles[i].low});
+  }
+  return {h, l};
+}
+
+function srLevels(candles, tol=0.002) {
+  const prices = candles.flatMap(c=>[c.high,c.low]).sort((a,b)=>a-b);
+  const clusters=[]; let g=[prices[0]];
+  for(let i=1;i<prices.length;i++){
+    if((prices[i]-g[0])/g[0]<tol) g.push(prices[i]);
+    else { if(g.length>=3) clusters.push(g); g=[prices[i]]; }
+  }
+  if(g.length>=3) clusters.push(g);
+  clusters.sort((a,b)=>b.length-a.length);
+  return clusters.slice(0,5).map(g=>g.reduce((a,b)=>a+b)/g.length);
+}
+
+function detectPatterns(candles, piv) {
+  const out=[];
+  const ph=piv.h, pl=piv.l;
+  // Double top
+  if(ph.length>=2){const a=ph.slice(-2); if(Math.abs(a[0].p-a[1].p)/a[0].p<0.015) out.push({n:'Double Top',t:'bear'});}
+  // Double bottom
+  if(pl.length>=2){const a=pl.slice(-2); if(Math.abs(a[0].p-a[1].p)/a[0].p<0.015) out.push({n:'Double Bottom',t:'bull'});}
+  // H&S
+  if(ph.length>=3){const a=ph.slice(-3); if(a[1].p>a[0].p&&a[1].p>a[2].p&&Math.abs(a[0].p-a[2].p)/a[1].p<0.03) out.push({n:'Head & Shoulders',t:'bear'});}
+  // Ascending triangle
+  if(ph.length>=2&&pl.length>=2){
+    const flatH=Math.abs(ph.slice(-2)[0].p-ph.slice(-2)[1].p)/ph.slice(-2)[0].p<0.02;
+    const risingL=pl[pl.length-1].p>pl[0].p;
+    if(flatH&&risingL) out.push({n:'Ascending Triangle',t:'bull'});
+    const flatL=Math.abs(pl.slice(-2)[0].p-pl.slice(-2)[1].p)/pl.slice(-2)[0].p<0.02;
+    const fallingH=ph[ph.length-1].p<ph[0].p;
+    if(flatL&&fallingH) out.push({n:'Descending Triangle',t:'bear'});
+  }
+  return out.slice(0,3);
+}
+
+// ── PARSE AI STRUCTURED RESPONSE ──────────────────────────────────────────
+function parseSetup(text) {
+  const entry = text.match(/entry[:\s]+\$?([\d,\.]+)/i);
+  const sl    = text.match(/stop[\s-]?loss[:\s]+\$?([\d,\.]+)/i);
+  const tp    = text.match(/target[:\s]+\$?([\d,\.]+)/i) || text.match(/take[\s-]?profit[:\s]+\$?([\d,\.]+)/i);
+  const rr    = text.match(/r[\s]?[:/][\s]?r[:\s]+([\d\.]+)/i) || text.match(/risk[\s/-]reward[:\s]+([\d\.]+)/i);
+  return {
+    entry: entry ? '$' + entry[1] : '—',
+    sl:    sl    ? '$' + sl[1]    : '—',
+    tp:    tp    ? '$' + tp[1]    : '—',
+    rr:    rr    ? rr[1] + 'R'   : '—'
+  };
+}
+
+// ── CALL CLAUDE API ───────────────────────────────────────────────────────
+async function callClaude(candles, levels, patterns, symbol, tf) {
+  const last = candles[candles.length-1];
+  const closes = candles.map(c=>c.close);
+  const e20 = ema(closes,20), e50 = ema(closes,50);
+  const pct = ((last.close - candles[0].close)/candles[0].close*100).toFixed(2);
+  const tfLabel = {'1':'1m','5':'5m','15':'15m','30':'30m','60':'1H','240':'4H','D':'1D'}[tf] || tf;
+  const above20 = last.close > e20[e20.length-1];
+  const above50 = last.close > e50[e50.length-1];
+
+  const prompt = `You are an elite crypto technical analyst. Analyze ${symbol} on the ${tfLabel} timeframe.
+
+MARKET DATA:
+- Price: $${last.close.toFixed(2)} | Change: ${pct}%
+- High: $${Math.max(...candles.map(c=>c.high)).toFixed(2)} | Low: $${Math.min(...candles.map(c=>c.low)).toFixed(2)}
+- EMA20: $${e20[e20.length-1].toFixed(2)} (price is ${above20?'ABOVE':'BELOW'})
+- EMA50: $${e50[e50.length-1].toFixed(2)} (price is ${above50?'ABOVE':'BELOW'})
+
+KEY LEVELS: ${levels.map(l=>`$${l.toFixed(2)}(${l>last.close?'R':'S'})`).join(', ')}
+
+PATTERNS: ${patterns.length?patterns.map(p=>`${p.n}(${p.t})`).join(', '):'None confirmed'}
+
+Respond in this EXACT format:
+
+BIAS: [Bullish/Bearish/Neutral]
+
+ENTRY: $[price]
+STOP LOSS: $[price]
+TARGET: $[price]
+RISK/REWARD: [ratio]R
+
+ANALYSIS:
+[3-4 sentences. Sharp. Direct. What the chart is saying, what to watch, one key risk. No fluff.]`;
+
+/* PASTE THIS NEW BLOCK INSTEAD */
+  const res = await fetch('/api/analyze', { 
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: prompt })
+  });
+  const data = await res.json();
+  return data.content.map(b=>b.text||'').join('');
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────────
+function renderResults(symbol, candles, levels, patterns, aiText) {
+  const last = candles[candles.length-1];
+  const prev = candles[candles.length-2];
+  const chgPct = ((last.close-prev.close)/prev.close*100);
+
+  // ticker
+  document.getElementById('rSymbol').textContent = symbol.replace('USDT','') + '/USDT';
+  document.getElementById('rPrice').textContent = '$' + last.close.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const chEl = document.getElementById('rChange');
+  chEl.textContent = (chgPct>=0?'+':'') + chgPct.toFixed(2) + '%';
+  chEl.className = 'price-chg ' + (chgPct>=0?'up':'down');
+
+  // bias
+  const biasMatch = aiText.match(/BIAS:\s*(Bullish|Bearish|Neutral)/i);
+  const bias = biasMatch ? biasMatch[1] : 'Neutral';
+  const biasEl = document.getElementById('rBias');
+  biasEl.textContent = bias.toUpperCase();
+  biasEl.className = 'bias-pill ' + (bias==='Bullish'?'bull':bias==='Bearish'?'bear':'neutral');
+
+  // levels
+  const levelsEl = document.getElementById('rLevels');
+  const sorted = [...levels].sort((a,b)=>b-a);
+  levelsEl.innerHTML = sorted.map(l => {
+    const isR = l > last.close;
+    return `<div class="level-row">
+      <span class="level-tag ${isR?'r':'s'}">${isR?'RESISTANCE':'SUPPORT'}</span>
+      <span class="level-price">$${l.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+    </div>`;
+  }).join('');
+
+  // patterns
+  const patEl = document.getElementById('rPatterns');
+  patEl.innerHTML = patterns.length
+    ? patterns.map(p=>`<span class="pattern-tag ${p.t==='bull'?'bull':p.t==='bear'?'bear':'neutral'}">${p.n}</span>`).join('')
+    : '<span class="pattern-tag neutral">None detected</span>';
+
+  // setup
+  const setup = parseSetup(aiText);
+  document.getElementById('rSetup').innerHTML = `
+    <div class="setup-card"><div class="setup-card-label">Entry</div><div class="setup-card-val entry">${setup.entry}</div></div>
+    <div class="setup-card"><div class="setup-card-label">Stop Loss</div><div class="setup-card-val sl">${setup.sl}</div></div>
+    <div class="setup-card"><div class="setup-card-label">Target</div><div class="setup-card-val tp">${setup.tp}</div></div>
+    <div class="setup-card"><div class="setup-card-label">Risk/Reward</div><div class="setup-card-val rr">${setup.rr}</div></div>
+  `;
+
+  // narrative
+  const narMatch = aiText.match(/ANALYSIS:\s*([\s\S]+)/i);
+  document.getElementById('rNarrative').textContent = narMatch ? narMatch[1].trim() : aiText;
+
+  // show
+  document.getElementById('idleState').style.display = 'none';
+  document.getElementById('loadingState').classList.remove('active');
+  document.getElementById('resultsPanel').classList.add('active');
+  document.getElementById('pulseEl').style.opacity = '1';
+}
+
+// ── MAIN ANALYSIS ─────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const rawSymbol = document.getElementById('symbolInput').value.trim().toUpperCase();
+  const symbol = rawSymbol.endsWith('USDT') ? rawSymbol : rawSymbol + 'USDT';
+  const btn = document.getElementById('analyzeBtn');
+
+  btn.disabled = true;
+  document.getElementById('idleState').style.display = 'none';
+  document.getElementById('resultsPanel').classList.remove('active');
+  document.getElementById('loadingState').classList.add('active');
+  document.getElementById('loadingLabel').textContent = 'FETCHING DATA...';
+
+  try {
+    const candles = await fetchCandles(symbol, currentTF, 150);
+
+    document.getElementById('loadingLabel').textContent = 'DETECTING LEVELS...';
+    const piv = pivots(candles);
+    const levels = srLevels(candles);
+    const patterns = detectPatterns(candles, piv);
+
+    document.getElementById('loadingLabel').textContent = 'CLAUDE IS THINKING...';
+    const aiText = await callClaude(candles, levels, patterns, symbol, currentTF);
+
+    renderResults(symbol, candles, levels, patterns, aiText);
+
+    // Also reload the TV widget for the symbol
+    document.getElementById('symbolInput').value = symbol;
+    loadTVWidget();
+
+  } catch(err) {
+    document.getElementById('loadingState').classList.remove('active');
+    document.getElementById('idleState').style.display = 'flex';
+    document.getElementById('idleState').querySelector('.idle-text').innerHTML =
+      `<span style="color:#ff1744">Error: ${err.message}</span><br><br>Try BTC, ETH, SOL, DOGE...`;
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+loadTVWidget();
+
+document.getElementById('symbolInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { loadTVWidget(); }
+});
+</script>
+</body>
+</html>
