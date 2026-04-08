@@ -687,7 +687,7 @@ async function callGemini(candles, levels, patterns, symbol, tf) {
     }
 
     // 4. Success! Map the text
-    return data.content.map(b => b.text || '').join('');
+    return data.text || "No analysis returned";
 
   } catch (err) {
     console.error("Fetch Error:", err);
