@@ -1,32 +1,26 @@
 export default async function handler(req, res) {
-  try {
-    const { prompt } = req.body;
+  const { prompt } = req.body;
+  const apiKey = process.env.GEMINI_API_KEY;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620', // Using the most stable model name
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }]
+        contents: [{ parts: [{ text: prompt }] }]
       })
     });
 
     const data = await response.json();
 
-    // THIS IS THE FIX: If there is an error, send the message as TEXT
-    if (data.error) {
-      return res.status(400).json({ 
-        error: { message: data.error.message || "Unknown API Error" } 
-      });
+    // Gemini returns data in 'candidates' instead of 'content'
+    if (data.candidates && data.candidates[0].content.parts[0].text) {
+      const aiResponse = data.candidates[0].content.parts[0].text;
+      res.status(200).json({ text: aiResponse });
+    } else {
+      res.status(500).json({ error: "Gemini Error: " + JSON.stringify(data) });
     }
-
-    res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: { message: error.message } });
+    res.status(500).json({ error: error.message });
   }
 }
