@@ -654,7 +654,7 @@ function parseSetup(text) {
   };
 }
 
-// --- REPLACE YOUR ENTIRE callGemini FUNCTION WITH THIS ---
+// --- REPLACE YOUR ENTIRE Gemini FUNCTION WITH THIS ---
 async function callGemini(candles, levels, patterns, symbol, tf) {
   const last = candles[candles.length-1];
   const closes = candles.map(c=>c.close);
