@@ -654,8 +654,8 @@ function parseSetup(text) {
   };
 }
 
-// --- REPLACE YOUR ENTIRE callClaude FUNCTION WITH THIS ---
-async function callClaude(candles, levels, patterns, symbol, tf) {
+// --- REPLACE YOUR ENTIRE callGemini FUNCTION WITH THIS ---
+async function callGemini(candles, levels, patterns, symbol, tf) {
   const last = candles[candles.length-1];
   const closes = candles.map(c=>c.close);
   const e20 = ema(closes,20), e50 = ema(closes,50);
@@ -773,7 +773,7 @@ async function runAnalysis() {
     const patterns = detectPatterns(candles, piv);
 
     document.getElementById('loadingLabel').textContent = 'CLAUDE IS THINKING...';
-    const aiText = await callClaude(candles, levels, patterns, symbol, currentTF);
+    const aiText = await callGemini(candles, levels, patterns, symbol, currentTF);
 
     renderResults(symbol, candles, levels, patterns, aiText);
 
